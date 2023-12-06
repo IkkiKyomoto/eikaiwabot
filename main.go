@@ -1,11 +1,19 @@
 package main
 
 import (
+	"eikaiwabot/model"
 	"fmt"
 	"net/http"
 	"os"
-	"eikaiwabot/model"
+
+	//line-bot-sdk-goをインポート
 	"github.com/line/line-bot-sdk-go/linebot"
+)
+
+// 証明書と鍵ファイルのパスを環境変数から取得
+var (
+	cert = os.Getenv("CERT_PATH")
+	key  = os.Getenv("KEY_PATH")
 )
 
 func main() {
@@ -34,7 +42,7 @@ func main() {
 			if event.Type == linebot.EventTypeMessage {
 				switch message := event.Message.(type) {
 				case *linebot.TextMessage:
-					replyMessage := linebot.NewTextMessage(model.CreateMessage(message.Text))
+					replyMessage := linebot.NewTextMessage(model.Handler(message.Text, event.Source.UserID))
 					_, err := bot.ReplyMessage(event.ReplyToken, replyMessage).Do()
 					if err != nil {
 						fmt.Println("返信メッセージの送信に失敗しました:", err)
@@ -46,8 +54,6 @@ func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "50124"
-	} 
-	cert := "home/ec2-user/eikaiwabot/fullchain.pem"
-	key := "home/ec2-user/eikaiwabot/privkey.pem"
+	}
 	http.ListenAndServeTLS(":"+port, cert, key, nil)
 }

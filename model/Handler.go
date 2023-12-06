@@ -3,12 +3,21 @@ package model
 //ボットサーバーで行う処理を記述
 import (
 	"bytes"
+	"database/sql"
+	"eikaiwabot/database"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+
+	_ "github.com/lib/pq"
+)
+
+const (
+	//エラー発生時にユーザー側に返されるメッセージ
+	errStr = "エラーが発生しました"
 )
 
 type (
@@ -37,40 +46,74 @@ type (
 )
 
 // createMessage関数は、ユーザーからのメッセージを受け取り、それをOpenAI APIに送信し、返却されたAIアシスタントの回答を文字列型で返す。
-func CreateMessage(message string) string {
-	res, err := sendRequest(message)
+func Handler(message string, userID string) string {
+	source := os.Getenv("SQL_SOURCE")
+	db, err := sql.Open("postgres", source)
 	if err != nil {
-		fmt.Println("エラーが発生しました:", err)
+		fmt.Println("DBとのコネクションでエラーが発生しました:", err)
+		return errStr
 	}
-	return res
+	defer db.Close()
+
+	// 受け取ったメッセージをDBに追加
+	latestAct := database.Activity{
+		Role:    "user",
+		UserID:  userID,
+		Message: message,
+	}
+	err = database.InsertRow(db, latestAct)
+	if err != nil {
+		fmt.Println("ユーザーから受け取ったメッセージの挿入でエラーが発生しました:", err)
+		return errStr
+	}
+
+	//　過去のメッセージを受け取る
+	acts, err := database.GetRows(db, latestAct.UserID)
+	if err != nil {
+		fmt.Println("アクティビティの取得でエラーが発生しました:", err)
+		return errStr
+	}
+
+	//メッセージを作成
+	messages := []Message{
+		{
+			Role:    "system",
+			Content: "You are an English teacher. You talk with user kindly",
+		},
+	}
+
+	for _, a := range acts {
+		messages = append(messages, Message{Role: a.Role, Content: a.Message})
+	}
+
+	//OpenAI APIにデータを送信
+	resStr, err := sendRequest(messages[:])
+	if err != nil {
+		fmt.Println("リクエストの処理でエラーが発生しました:", err)
+		return errStr
+	}
+
+	err = database.InsertRow(db, database.Activity{UserID: latestAct.UserID, Role: "assistant", Message: resStr})
+	if err != nil {
+		fmt.Println("ユーザーから受け取ったメッセージの挿入でエラーが発生しました:", err)
+		return errStr
+	}
+
+	return resStr
 }
 
 // OpenAI APIにリクエストを送信
-func sendRequest(message string) (string, error) {
+func sendRequest(messages []Message) (string, error) {
 	const (
 		//chatGFTのエンドURL
 		apiUrl      = "https://api.openai.com/v1/chat/completions"
 		model       = "gpt-3.5-turbo-0613"
 		method      = "POST"
 		temperature = 0.7
-		//エラー発生時にユーザー側に返されるメッセージ
-		errStr = "エラーが発生しました"
 	)
 
 	//OpenAI APIキー
 	apiKey := os.Getenv("OPENAI_API_KEY")
-
-	//OpenAI APIに送信するデータを作成
-	messages := []Message{
-		{
-			Role:    "system",
-			Content: "You are an English teacher. You talk with user kindly",
-		},
-		{
-			Role:    "user",
-			Content: message,
-		},
-	}
 
 	jreq := JsonReq{
 		Model:       model,
