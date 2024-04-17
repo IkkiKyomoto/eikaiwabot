@@ -39,6 +39,7 @@ type (
 		Model       string    `json:"model"`
 		Messages    []Message `json:"messages"`
 		Temperature float32   `json:"temperature"`
+		MaxTokens   int       `json:"max_tokens"`
 	}
 	//OpenAI APIから受け取ったデータを格納する構造体
 	JsonRes struct {
@@ -103,7 +104,7 @@ func Handler(message string, userID string) string {
 
 	err = database.InsertRow(db, database.Activity{UserID: latestAct.UserID, Role: "assistant", Message: resStr})
 	if err != nil {
-		fmt.Println("ユーザーから受け取ったメッセージの挿入でエラーが発生しました:", err)
+		fmt.Println("APIから受け取ったメッセージの挿入でエラーが発生しました:", err)
 		return errStr
 	}
 
@@ -117,12 +118,14 @@ func sendRequest(messages []Message) (string, error) {
 		apiUrl      = "https://api.openai.com/v1/chat/completions"
 		method      = "POST"
 		temperature = 0.7
+		maxTokens = 1000
 	)
 
 	jreq := JsonReq{
 		Model:       MODEL,
 		Messages:    messages,
 		Temperature: temperature,
+		MaxTokens:   maxTokens,
 	}
 
 	reqData, err := json.Marshal(jreq)

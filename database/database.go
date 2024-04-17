@@ -26,7 +26,7 @@ func InsertRow(db *sql.DB, act Activity) error {
 
 // 過去のアクティビティを取得
 func GetRows(db *sql.DB, userID string) ([]Activity, error) {
-	rows, err := db.Query("SELECT message, role FROM Activity WHERE userid = $1 ORDER BY id LIMIT $2", userID, numberOfActs)
+	rows, err := db.Query("SELECT message, role FROM (SELECT * FROM Activity WHERE userid = $1 ORDER BY id DESC LIMIT $2) AS decended ORDER BY id", userID, numberOfActs)
 	if err != nil {
 		return []Activity{}, err
 	}
