@@ -20,6 +20,14 @@ const (
 	errStr = "エラーが発生しました"
 )
 
+var (
+	//環境変数の読み込み
+	SQL_SOURCE     = os.Getenv("SQL_SOURCE")
+	SQL            = os.Getenv("SQL")
+	OPENAI_API_KEY = os.Getenv("OPENAI_API_KEY")
+	MODEL          = os.Getenv("MODEL")
+)
+
 type (
 	//OpenAI APIに送信するデータを格納する構造体
 	Message struct {
@@ -47,8 +55,8 @@ type (
 
 // createMessage関数は、ユーザーからのメッセージを受け取り、それをOpenAI APIに送信し、返却されたAIアシスタントの回答を文字列型で返す。
 func Handler(message string, userID string) string {
-	source := os.Getenv("SQL_SOURCE")
-	db, err := sql.Open("postgres", source)
+
+	db, err := sql.Open(SQL, SQL_SOURCE)
 	if err != nil {
 		fmt.Println("DBとのコネクションでエラーが発生しました:", err)
 		return errStr
@@ -105,18 +113,14 @@ func Handler(message string, userID string) string {
 // OpenAI APIにリクエストを送信
 func sendRequest(messages []Message) (string, error) {
 	const (
-		//chatGFTのエンドURL
+		//chatGPTのエンドURL
 		apiUrl      = "https://api.openai.com/v1/chat/completions"
-		model       = "gpt-3.5-turbo-0613"
 		method      = "POST"
 		temperature = 0.7
 	)
 
-	//OpenAI APIキー
-	apiKey := os.Getenv("OPENAI_API_KEY")
-
 	jreq := JsonReq{
-		Model:       model,
+		Model:       MODEL,
 		Messages:    messages,
 		Temperature: temperature,
 	}
@@ -136,7 +140,7 @@ func sendRequest(messages []Message) (string, error) {
 
 	// リクエストヘッダーを設定
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", OPENAI_API_KEY))
 
 	// HTTPクライアントを作成
 	client := &http.Client{}
@@ -155,7 +159,7 @@ func sendRequest(messages []Message) (string, error) {
 		fmt.Println("応答の読み取り中にエラーが発生しました:", err)
 		return errStr, err
 	}
-	// Jsonデータをデコード
+	// JSONデータをデコード
 	var jres JsonRes
 	if err := json.Unmarshal(responseBody, &jres); err != nil {
 		fmt.Println("Jsonデータのデコードでエラーが発生しました:", err)

@@ -7,19 +7,27 @@ import (
 	"os"
 
 	//line-bot-sdk-goをインポート
+	"github.com/joho/godotenv"
 	"github.com/line/line-bot-sdk-go/linebot"
 )
 
-// 証明書と鍵ファイルのパスを環境変数から取得
+// 環境変数を取得
 var (
-	cert = os.Getenv("CERT_PATH")
-	key  = os.Getenv("KEY_PATH")
+	KEY_PATH       = os.Getenv("CERT_PATH")
+	CERT_PATH      = os.Getenv("KEY_PATH")
+	CHANNEL_SECRET = os.Getenv("CHANNEL_SECRET")
+	PORT           = os.Getenv("PORT")
+	CHANNEL_TOKEN  = os.Getenv("CHANNEL_TOKEN")
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("環境変数の読み込みに失敗しました:", err)
+	}
 	bot, err := linebot.New(
-		os.Getenv("CHANNEL_SECRET"),
-		os.Getenv("CHANNEL_TOKEN"),
+		CHANNEL_SECRET,
+		CHANNEL_TOKEN,
 	)
 
 	if err != nil {
@@ -51,9 +59,8 @@ func main() {
 			}
 		}
 	})
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "50124"
+	if PORT == "" {
+		PORT = "443"
 	}
-	http.ListenAndServeTLS(":"+port, cert, key, nil)
+	http.ListenAndServeTLS(":"+PORT, CERT_PATH, KEY_PATH, nil)
 }
